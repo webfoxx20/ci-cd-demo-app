@@ -51,6 +51,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set short SHA                           # ← add this back
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
       - name: Download jar artifact
         uses: actions/download-artifact@v4
         with:
@@ -76,5 +79,4 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ vars.DOCKERHUB_USERNAME }}/webserver-app:${{ github.sha }}
-            ${{ vars.DOCKERHUB_USERNAME }}/webserver-app:latest
+            ${{ vars.DOCKERHUB_USERNAME }}/webserver-app:${{ env.SHORT_SHA }}
