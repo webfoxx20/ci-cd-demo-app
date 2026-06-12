@@ -7,51 +7,55 @@
 # documentation.
 
 name: Java CI with Maven
+
 on:
   push:
-    branches:
-      - "feature/**"
-      - "master"
   pull_request:
     branches:
       - "master"
+
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up JDK 21
-      uses: actions/setup-java@v4
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: maven
+      - uses: actions/checkout@v4
 
-    - name: Run Tests        # ← explicitly runs tests first
-      run: mvn -B test --file pom.xml
-      
-    - name: Build app
-      run: mvn -B package --file pom.xml
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
 
-    - name: Upload jar artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-jar
-        path: target/webserver-0.0.1-SNAPSHOT.jar
+      - name: Run Tests
+        run: mvn -B test --file pom.xml
 
+      - name: Build app
+        run: mvn -B package --file pom.xml -DskipTests  # ← add -DskipTests
+        #   tests already ran above
 
+      - name: Upload jar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-jar
+          path: target/webserver-0.0.1-SNAPSHOT.jar
 
-    - name: Update dependency graph
-      uses: advanced-security/maven-dependency-submission-action@571e99aab1055c2e71a1e2309b9691de18d6b7d6
-  docker:
+      - name: Update dependency graph
+        uses: advanced-security/maven-dependency-submission-action@571e99aab1055c2e71a1e2309b9691de18d6b7d6
+
+  push_image_to_docker:
     runs-on: ubuntu-latest
-    needs: build
+    needs: build                         # ← only runs if build passes
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set short SHA                           # ← add this back
+      - name: Set short SHA
         run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
       - name: Download jar artifact
@@ -59,7 +63,6 @@ jobs:
         with:
           name: app-jar
           path: target/
-
 
       - name: Login to Docker Hub
         uses: docker/login-action@v4
@@ -80,3 +83,30 @@ jobs:
           push: true
           tags: |
             ${{ vars.DOCKERHUB_USERNAME }}/webserver-app:${{ env.SHORT_SHA }}
+            ${{ vars.DOCKERHUB_USERNAME }}/webserver-app:latest  # ← added back
+
+  deploy_to_k8s:
+    runs-on: ubuntu-latest
+    needs: push_image_to_docker          # ← only runs if docker job passes
+
+    steps:
+      - name: Checkout manifests repo
+        uses: actions/checkout@v4
+        with:
+          repository: twentyszn/k8s-manifests    # ← your manifests repo
+          token: ${{ secrets.REPO_TOKEN }}          # ← your GitHub token
+
+      - name: Set short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Update image tag in values.yaml
+        run: |
+          sed -i "s|tag:.*|tag: ${{ env.SHORT_SHA }}|g" webserver-app/values.yaml
+
+      - name: Commit and push updated manifest
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add webserver-app/values.yaml
+          git commit -m "Update image tag to ${{ env.SHORT_SHA }}"
+          git push
