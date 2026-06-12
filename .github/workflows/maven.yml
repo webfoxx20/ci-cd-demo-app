@@ -31,11 +31,10 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Run Tests
-        run: mvn -B test --file pom.xml
 
-      - name: Build app
-        run: mvn -B package --file pom.xml -DskipTests  # ← add -DskipTests
+
+      - name: Test and  Build app
+        run: mvn -B package --file pom.xml
         #   tests already ran above
 
       - name: Upload jar artifact
