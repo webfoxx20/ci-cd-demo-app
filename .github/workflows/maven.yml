@@ -90,7 +90,7 @@ jobs:
       - name: Checkout manifests repo
         uses: actions/checkout@v4
         with:
-          repository: twentyszn/k8s-manifests    # ← your manifests repo
+          repository: webserver-app-helm-file   # ← your manifests repo
           token: ${{ secrets.REPO_TOKEN }}          # ← your GitHub token
 
       - name: Set short SHA
