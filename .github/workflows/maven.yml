@@ -80,6 +80,7 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ vars.DOCKERHUB_USERNAME }}/webserver-app:${{ env.SHORT_SHA }}
   deploy_to_k8s:
